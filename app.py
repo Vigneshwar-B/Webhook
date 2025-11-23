@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 
@@ -10,22 +11,17 @@ def jira_webhook():
 
         # Only react to issue deletion
         if data.get('webhookEvent') == 'jira:issue_deleted':
-            # Jira sends the deleted issue key here:
-            issue_key = data['issue']['key']  # ← This is the ID like TTO-123
-
-            # Who deleted it (optional but nice)
+            issue_key = data['issue']['key']  # ← e.g., TTO-123
             deleter = data.get('user', {}).get('displayName', 'Unknown User')
-
             timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
             log_line = f"{timestamp} | DELETED | {issue_key} | by {deleter}\n"
 
             print("ISSUE DELETED →", log_line.strip())
 
-            # Save to log file (visible in Render Logs + persistent)
+            # Save to persistent log file
             with open("deleted_issues.log", "a", encoding="utf-8") as f:
                 f.write(log_line)
 
-        # Always respond fast so Jira doesn't retry
         return jsonify({"status": "ok"}), 200
 
     except Exception as e:
@@ -35,14 +31,17 @@ def jira_webhook():
 
 @app.route('/')
 def home():
-    return """
+    return f"""
     <h1>Jira Issue Deletion Webhook – LIVE</h1>
     <p>Only listens for <code>jira:issue_deleted</code></p>
     <p>Deleted issue keys appear instantly in logs!</p>
     <hr>
-    <p>Your URL: <code>https://webhook-1-py.onrender.com/jira</code></p>
+    <p><strong>YOUR WEBHOOK URL:</strong></p>
+    <h2><code>https://webhook-issue-deleted.onrender.com/jira</code></h2>
+    <p><small>Use this exact URL in Jira → System → Webhooks</small></p>
     """
 
+
 if __name__ == "__main__":
-    from os import environ
-    app.run(host="0.0.0.0", port=int(environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
